@@ -1,4 +1,4 @@
-package com.secor.orderservice;
+package com.scz.orderservice;
 
 
 import lombok.Getter;
