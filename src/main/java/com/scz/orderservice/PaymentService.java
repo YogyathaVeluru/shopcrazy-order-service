@@ -78,7 +78,7 @@ public class PaymentService
                             String[] stage1responseArray = stage1response.split(" ");
                             String[] orderidarray = stage1responseArray[1].split(":");
                             String orderid = orderidarray[1];
-                            Order order = orderRepository.findById(orderid).get();
+                            Order order = orderRepository.findById(orderid).block();
                             order.setStatus("PAYMENT PENDING");
                             order.setPayment_id(response);
                             orderRepository.save(order);
@@ -106,7 +106,7 @@ public class PaymentService
                             String[] stage1responseArray = stage1response.split(" ");
                             String[] orderidarray = stage1responseArray[1].split(":");
                             String orderid = orderidarray[1];
-                            Order order = orderRepository.findById(orderid).get();
+                            Order order = orderRepository.findById(orderid).block();
                             order.setStatus("PAYMENT CREATION FAILED");
                             orderRepository.save(order);
                             try

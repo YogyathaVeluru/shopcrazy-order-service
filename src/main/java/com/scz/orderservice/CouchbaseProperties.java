@@ -1,4 +1,4 @@
-package com.scz.orderservice.infrastructure;
+package com.scz.orderservice;
 
 import lombok.Getter;
 import lombok.Setter;

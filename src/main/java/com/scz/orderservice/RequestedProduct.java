@@ -1,14 +1,11 @@
-package com.scz.orderservice.domain;
+package com.scz.orderservice;
 
-import lombok.Builder;
 import lombok.Getter;
-import org.springframework.data.couchbase.core.mapping.Document;
 import org.springframework.data.annotation.Id;
 
-@Builder
+
 @Getter
-@Document
-public class Product {
+public class RequestedProduct {
     @Id
     private String id;
 

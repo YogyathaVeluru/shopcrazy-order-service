@@ -1,6 +1,8 @@
 package com.scz.orderservice;
 
-import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.couchbase.repository.ReactiveCouchbaseRepository;
+import org.springframework.stereotype.Repository;
 
-public interface OrderRepository extends MongoRepository<Order, String> {
+@Repository
+public interface OrderRepository extends ReactiveCouchbaseRepository<Order, String> {
 }

@@ -9,17 +9,24 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 
 @RestController
-@RequestMapping("api/v1")
-public class MainRestController {
+@RequestMapping("shopcrazy/order/v1")
+public class OrderController {
 
-    private static final Logger log = LoggerFactory.getLogger(MainRestController.class);
+    private static final Logger log = LoggerFactory.getLogger(OrderController.class);
 
     @Autowired
     OrderRepository orderRepository;
@@ -31,9 +38,6 @@ public class MainRestController {
     PaymentService paymentService;
 
     @Autowired
-    MenuService menuService;
-
-    @Autowired
     RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
@@ -42,13 +46,13 @@ public class MainRestController {
     @GetMapping("get/order/{orderid}")
     public ResponseEntity<?> getOrder(@PathVariable("orderid") String orderid)
     {
-        Order order = orderRepository.findById(orderid).get();
+        Order order = orderRepository.findById(orderid).block();
         return ResponseEntity.ok(order);
     }
 
 
-    @PostMapping("create/order")
-    public ResponseEntity<?> createOrder(@RequestBody Order order,
+    @PostMapping("create")
+    public ResponseEntity<?> createOrder(@RequestBody OrderRequest incomingOrderRequest,
                                          @RequestHeader("Authorization") String token,
                                          HttpServletRequest request,
                                          HttpServletResponse response) throws JsonProcessingException {
@@ -70,15 +74,27 @@ public class MainRestController {
         }
         log.info("cookie check complete");
 
+        Order.OrderBuilder orderBuilder = Order.builder().orderid(incomingOrderRequest.getUsername() + UUID.randomUUID());
+
         if( cookieList.stream().filter(cookie -> cookie.getName().equals("order-service-stage-1")).findAny().isEmpty()) // COOKIE_CHECK
         {
-            log.info("Received request to create order: {}", order);
+            log.info("Received request to create order for user {}", incomingOrderRequest.getUsername());
             if(authService.validateToken(token))
             {
                 log.info("Token is valid: {}", token);
-                log.info("Proceeding to create order: {}", order);
-                order.setOrderid(String.valueOf(new Random().nextInt(1000)));
-                order.setStatus("PROCESSING");
+                log.info("Proceeding to create order");
+                Order order = orderBuilder
+                        .orderid(incomingOrderRequest.getUsername() + UUID.randomUUID().toString())
+                        .productsInOrder(incomingOrderRequest.getRequestedProducts().stream()
+                                .map(reqProduct -> Product.builder()
+                                        .id(reqProduct.getId())
+                                        .name(reqProduct.getName())
+                                        .quantity(reqProduct.getQuantity())
+                                        .price(reqProduct.getPrice()).build()
+                                ).toList()
+                        )
+                        .status("PROCESSING").build();
+
                 producer.publishOrderDatum(order.getOrderid(),
                                                 "CREATE",
                         "Order Created Successfully with Order ID: " + order.getOrderid(),
@@ -92,7 +108,7 @@ public class MainRestController {
                 PaymentRequest paymentRequest = new PaymentRequest();
                 paymentRequest.setOrder_id(order.getOrderid());
                 paymentRequest.setPayment_id(null);
-                paymentRequest.setAmount(menuService.calculateOrder(order));
+                paymentRequest.setAmount(order.calculateFinalAmount(order.getProductsInOrder()));
                 log.info("Payment Request created successfully: {}", paymentRequest);
 
                 log.info("Sending request to Payment Service");
@@ -140,7 +156,7 @@ public class MainRestController {
             }
             else if(cacheResponseArray[0].equals("paymentid:orderid"))
             {
-                return ResponseEntity.ok("Order Created Successfully with Order ID: " + order.getOrderid() + " and Payment ID: " + cacheResponseArray[1]);
+                return ResponseEntity.ok("Order Created Successfully with Order ID: " + orderBuilder.build().getOrderid() + " and Payment ID: " + cacheResponseArray[1]);
             }
             else
             {
