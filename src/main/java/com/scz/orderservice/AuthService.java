@@ -17,18 +17,18 @@ public class AuthService
     @Qualifier("auth-service-validate")
     WebClient webClient;
 
-    public boolean validateToken(String token) {
+    public ValidateResponse validateToken(String token) {
 
 
         log.info("Validating token within the AuthService: {}", token);
         log.info("Sending request to auth service to validate token: {}", token);
 
-        String response = webClient.get()
+        ValidateResponse response = webClient.get()
                 .header("Authorization", token)
                 .retrieve()
-                .bodyToMono(String.class).block(); // Current Thread will pause till the final response comes back
+                .bodyToMono(ValidateResponse.class).block(); // Current Thread will pause till the final response comes back
 
         log.info("Response from auth service: {}", response);
-        return response.equalsIgnoreCase("valid");
+        return response;
     }
 }

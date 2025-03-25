@@ -16,10 +16,10 @@ public class Order
 {
 
     @Id
-    private String orderid;
+    private String orderId;
     private String username;
     List<Product> productsInOrder;
-    private String payment_id;
+    private String paymentId;
     private String status;
 
     public double calculateFinalAmount(List<Product> products) {

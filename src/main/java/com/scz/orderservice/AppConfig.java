@@ -12,7 +12,7 @@ public class AppConfig {
     public WebClient webClientAuthService(WebClient.Builder webClientBuilder)
     {
         return webClientBuilder
-                .baseUrl("http://localhost:8082/api/v1/validate")
+                .baseUrl("http://localhost:8087/shopcrazy/auth/v1/validate")
                 .filter(new LoggingWebClientFilter())
                 .build();
     }
@@ -21,7 +21,7 @@ public class AppConfig {
     public WebClient webClientPymntService(WebClient.Builder webClientBuilder)
     {
         return webClientBuilder
-                .baseUrl("http://localhost:8102/api/v1/create/payment")
+                .baseUrl("http://localhost:8086/shopcrazy/payment/v1/create")
                 .filter(new LoggingWebClientFilter())
                 .build();
     }

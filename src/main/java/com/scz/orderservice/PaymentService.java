@@ -78,22 +78,38 @@ public class PaymentService
                             String[] stage1responseArray = stage1response.split(" ");
                             String[] orderidarray = stage1responseArray[1].split(":");
                             String orderid = orderidarray[1];
-                            Order order = orderRepository.findById(orderid).block();
-                            order.setStatus("PAYMENT PENDING");
-                            order.setPayment_id(response);
-                            orderRepository.save(order);
-                            try
-                            {
-                                producer.publishOrderDatum(order.getOrderid(),
-                                        "UPDATE",
-                                        "Order Status updated to PAYMENT PENDING and Payment ID: " + response + " with Order ID: " + order.getOrderid(),
-                                        order.getStatus(),
-                                        order.getPayment_id());
-                            }
-                            catch (JsonProcessingException e)
-                            {
-                                throw new RuntimeException(e);
-                            }
+                            orderRepository.findById(orderid)
+                                    .switchIfEmpty(Mono.error(new RuntimeException("Order not found for id: " + orderid)))
+                                    .map(order -> {
+                                        order.setOrderId(orderid);
+                                        order.setStatus("PAYMENT PENDING");
+                                        order.setPaymentId(response);
+                                        return order;
+                                    })
+                                    .flatMap(updatedOrder -> orderRepository.save(updatedOrder)
+                                            .switchIfEmpty(Mono.error(new RuntimeException("Failed to save order")))
+                                    )
+                                    .doOnSuccess(savedOrder -> {
+                                        try {
+                                            producer.publishOrderDatum(
+                                                    savedOrder.getOrderId(),
+                                                    "UPDATE",
+                                                    "Order Status updated to PAYMENT PENDING and Payment ID: "
+                                                            + response
+                                                            + " with Order ID: "
+                                                            + savedOrder.getOrderId(),
+                                                    savedOrder.getStatus(),
+                                                    savedOrder.getPaymentId()
+                                            );
+                                        } catch (JsonProcessingException e) {
+                                            throw new RuntimeException(e);
+                                        }
+                                    })
+                                    .subscribe(
+                                        savedOrder -> System.out.println("Order processed: " + savedOrder),
+                                        error -> System.err.println("Error processing order: " + error.getMessage())
+
+                                    );
                             log.info("Updated status of the Order to PAID successfully");
                             redisTemplate.opsForValue().set(responseKey,"paymentid:orderid "+response+":"+orderid);
                         },
@@ -106,21 +122,28 @@ public class PaymentService
                             String[] stage1responseArray = stage1response.split(" ");
                             String[] orderidarray = stage1responseArray[1].split(":");
                             String orderid = orderidarray[1];
-                            Order order = orderRepository.findById(orderid).block();
-                            order.setStatus("PAYMENT CREATION FAILED");
-                            orderRepository.save(order);
-                            try
-                            {
-                                producer.publishOrderDatum(order.getOrderid(),
-                                        "UPDATE",
-                                        "Order Status updated to PAYMENT CREATION FAILED with Order ID: " + order.getOrderid(),
-                                        order.getStatus(),
-                                        order.getPayment_id());
-                            }
-                            catch (JsonProcessingException e)
-                            {
-                                throw new RuntimeException(e);
-                            }
+                            orderRepository.findById(orderid)
+                                .map(order1 -> {
+                                    order1.setOrderId(orderid);
+                                    order1.setStatus("PAYMENT CREATION FAILED");
+                                    return order1;
+                                })
+                                .flatMap(updateOrder -> orderRepository.save(updateOrder))
+                                .doOnSuccess(savedOrder -> {
+                                    try
+                                    {
+                                        producer.publishOrderDatum(savedOrder.getOrderId(),
+                                                "UPDATE",
+                                                "Order Status updated to PAYMENT CREATION FAILED with Order ID: " + savedOrder.getOrderId(),
+                                                savedOrder.getStatus(),
+                                                savedOrder.getPaymentId());
+                                    }
+                                    catch (JsonProcessingException e)
+                                    {
+                                        throw new RuntimeException(e);
+                                    }
+                                }).subscribe();
+
                             log.info("Updated status of the Order to FAILED successfully");
 
                             redisTemplate.opsForValue().set(responseKey,"error "+error.getMessage());
